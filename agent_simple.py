@@ -2,43 +2,13 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from typing import Dict, Any
 from datetime import datetime
-from strands import Agent
 import logging
-import os
-import boto3
-from dotenv import load_dotenv
 
-# Load environment variables from .env file if it exists
-load_dotenv()
-
-# Set up logging first
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configure AWS credentials for Bedrock access
-# This ensures the agent can access AWS Bedrock models
-os.environ.setdefault('AWS_DEFAULT_REGION', 'us-east-1')
-
-# Verify AWS credentials are available
-try:
-    # Test if we can create a Bedrock client
-    bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
-    logger.info("✅ AWS credentials configured successfully")
-except Exception as e:
-    logger.warning(f"⚠️ AWS credentials issue: {e}")
-    logger.info("💡 Make sure you have AWS credentials configured via:")
-    logger.info("   - AWS CLI: aws configure")
-    logger.info("   - Environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
-    logger.info("   - IAM role (if running on EC2/ECS)")
-
-app = FastAPI(title="Strands Agent Server", version="1.0.0")
-
-# Initialize Strands agent with AWS Bedrock model
-# Using Mistral Large since we have access to it
-strands_agent = Agent(
-    model="anthropic.claude-3-5-sonnet-20240620-v1:0",
-    system_prompt="You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user queries."
-)
+app = FastAPI(title="Simple Mock Agent Server", version="1.0.0")
 
 class InvocationRequest(BaseModel):
     input: Dict[str, Any]
@@ -69,7 +39,6 @@ async def log_requests(request: Request, call_next):
 async def invoke_agent(request: InvocationRequest):
     """
     REQUIRED endpoint for Bedrock AgentCore service contract
-    Must handle: {"input": {"prompt": "..."}}
     """
     logger.info(f"🎯 /invocations endpoint called with: {request}")
     return await invoke_agent_logic(request)
@@ -92,7 +61,7 @@ async def invoke_agent_alt(request: InvocationRequest):
 
 async def invoke_agent_logic(request: InvocationRequest):
     """
-    Common logic for all invocation endpoints
+    Simple mock agent logic that doesn't require Bedrock
     """
     try:
         # Extract prompt from the correct format: {"input": {"prompt": "..."}}
@@ -104,31 +73,25 @@ async def invoke_agent_logic(request: InvocationRequest):
             )
 
         logger.info(f"🤖 Processing message: {user_message}")
-        result = strands_agent(user_message)
-        logger.info(f"🤖 Strands result: {result}")
         
-        # Extract the actual text content from the strands response
-        # The response structure is: {'role': 'assistant', 'content': [{'text': 'actual message'}]}
-        if isinstance(result.message, dict) and 'content' in result.message:
-            # Extract text from content array
-            content = result.message['content']
-            if content and isinstance(content[0], dict) and 'text' in content[0]:
-                message_text = content[0]['text']
-            else:
-                message_text = str(content)
+        # Simple mock response - replace this with actual AI logic later
+        if "hello" in user_message.lower():
+            response_text = "Hello! I'm a mock AI agent. I'm working perfectly and ready to help you!"
+        elif "how are you" in user_message.lower():
+            response_text = "I'm doing great! I'm a simple mock agent that's working without any external dependencies."
         else:
-            message_text = str(result.message)
+            response_text = f"I received your message: '{user_message}'. This is a mock response from a working agent!"
         
-        logger.info(f"📝 Extracted message: {message_text}")
+        logger.info(f"📝 Mock response: {response_text}")
         
         # Follow EXACT Bedrock AgentCore response format from AWS documentation
         response = {
             "message": {
                 "role": "assistant", 
-                "content": [{"text": message_text}]
+                "content": [{"text": response_text}]
             },
             "timestamp": datetime.utcnow().isoformat(),
-            "model": "strands-agent"
+            "model": "mock-agent"
         }
 
         logger.info(f"✅ Returning response: {response}")
@@ -153,7 +116,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "service": "strands-agent",
+        "service": "mock-agent",
         "version": "1.0.0"
     }
 
@@ -168,7 +131,7 @@ async def info():
     """Info endpoint for basic connectivity test"""
     logger.info("🏠 /info endpoint called")
     return {
-        "message": "Strands Agent Server is running",
+        "message": "Simple Mock Agent Server is running",
         "endpoints": {
             "health": "/health",
             "healthz": "/healthz",
