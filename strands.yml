@@ -1,0 +1,4 @@
+llm:
+  provider: aws-bedrock
+  model: anthropic.claude-3-sonnet-20240229-v1:0
+  region: eu-west-2
