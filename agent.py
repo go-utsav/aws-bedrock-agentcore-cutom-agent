@@ -5,7 +5,7 @@ from datetime import datetime
 from strands import Agent
 import logging
 import os
-import boto3
+import boto3 
 from dotenv import load_dotenv
 
 # Load environment variables from .env file if it exists
