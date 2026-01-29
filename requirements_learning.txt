@@ -1,0 +1,4 @@
+# Additional requirements for enhanced memory and learning system
+numpy>=1.24.0
+websockets>=11.0.0
+python-multipart>=0.0.6

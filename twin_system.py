@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -9,6 +10,7 @@ import boto3
 from dotenv import load_dotenv
 import json
 import uuid
+from agent_learning import MemoryManager, LearningEngine
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +23,15 @@ logger = logging.getLogger(__name__)
 os.environ.setdefault('AWS_DEFAULT_REGION', 'us-east-1')
 
 app = FastAPI(title="AppBank Twin System", version="1.0.0")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify your frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods (GET, POST, PUT, DELETE, OPTIONS, etc.)
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Agent Registry
 AGENT_REGISTRY = {
@@ -74,11 +85,21 @@ for agent_id, config in AGENT_REGISTRY.items():
     except Exception as e:
         logger.error(f"❌ Failed to initialize agent {agent_id}: {e}")
 
-# Memory store for each agent (in production, use AWS Bedrock Memory)
+# Initialize enhanced memory and learning systems
+memory_manager = MemoryManager(use_aws_memory=True)
+learning_engine = LearningEngine(memory_manager)
+
+# Legacy memory store for backward compatibility
 agent_memories = {agent_id: [] for agent_id in AGENT_REGISTRY.keys()}
 
 class InvocationRequest(BaseModel):
     input: Dict[str, Any]
+
+class StandardResponse(BaseModel):
+    status: str  # "success" or "error"
+    message: str
+    data: Optional[Dict[str, Any]] = None
+    timestamp: str = None
 
 class InvocationResponse(BaseModel):
     output: Dict[str, Any]
@@ -88,6 +109,32 @@ class TwinSystemRequest(BaseModel):
     target_agent: Optional[str] = None  # If None, use team coordinator
     collaboration_mode: Optional[str] = "orchestrator"  # "orchestrator" or "direct"
     context: Optional[Dict[str, Any]] = None
+    user_id: Optional[str] = None  # For learning and personalization
+    enable_learning: Optional[bool] = True  # Enable learning from conversation
+
+class ConversationRequest(BaseModel):
+    message: str
+    agent_id: str
+    user_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+
+def create_success_response(message: str, data: Optional[Dict[str, Any]] = None) -> StandardResponse:
+    """Create a standardized success response"""
+    return StandardResponse(
+        status="success",
+        message=message,
+        data=data,
+        timestamp=datetime.utcnow().isoformat()
+    )
+
+def create_error_response(message: str, data: Optional[Dict[str, Any]] = None) -> StandardResponse:
+    """Create a standardized error response"""
+    return StandardResponse(
+        status="error",
+        message=message,
+        data=data,
+        timestamp=datetime.utcnow().isoformat()
+    )
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -102,10 +149,77 @@ async def invoke_agent(request: InvocationRequest):
     """Main endpoint for Bedrock AgentCore compatibility"""
     return await invoke_agent_logic(request)
 
-@app.post("/twin-system", response_model=InvocationResponse)
+@app.post("/twin-system", response_model=StandardResponse)
 async def twin_system_invoke(request: TwinSystemRequest):
     """Twin system endpoint for multi-agent collaboration"""
-    return await handle_twin_system_request(request)
+    try:
+        result = await handle_twin_system_request(request)
+        return create_success_response(
+            message=f"Twin system collaboration completed",
+            data=result.output
+        )
+    except Exception as e:
+        logger.error(f"❌ Twin system endpoint error: {e}", exc_info=True)
+        return create_error_response(
+            message=f"Twin system collaboration failed: {str(e)}",
+            data={"target_agent": request.target_agent, "collaboration_mode": request.collaboration_mode}
+        )
+
+@app.post("/conversation", response_model=StandardResponse)
+async def conversation_endpoint(request: ConversationRequest):
+    """Enhanced conversation endpoint with learning"""
+    try:
+        import asyncio
+        
+        # Add timeout to prevent hanging
+        result = await asyncio.wait_for(
+            handle_conversation_request(request),
+            timeout=45.0  # 45 second timeout
+        )
+        return create_success_response(
+            message=f"Conversation completed with {result.output.get('agent', 'Unknown Agent')}",
+            data=result.output
+        )
+    except asyncio.TimeoutError:
+        logger.error(f"❌ Conversation timeout for agent {request.agent_id}")
+        return create_error_response(
+            message="Conversation timeout - please try again",
+            data={"agent_id": request.agent_id, "user_id": request.user_id}
+        )
+    except Exception as e:
+        logger.error(f"❌ Conversation endpoint error: {e}", exc_info=True)
+        return create_error_response(
+            message=f"Conversation failed: {str(e)}",
+            data={"agent_id": request.agent_id, "user_id": request.user_id}
+        )
+
+@app.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    """WebSocket for real-time messaging"""
+    await websocket.accept()
+    logger.info(f"🔌 WebSocket connected for user: {user_id}")
+    
+    try:
+        while True:
+            data = await websocket.receive_text()
+            message_data = json.loads(data)
+            
+            # Process message through twin system
+            response = await handle_conversation_request(ConversationRequest(
+                message=message_data.get("message", ""),
+                agent_id=message_data.get("agent_id", "team_coordinator"),
+                user_id=user_id,
+                conversation_id=message_data.get("conversation_id")
+            ))
+            
+            # Send response back
+            await websocket.send_text(json.dumps(response.output))
+            
+    except WebSocketDisconnect:
+        logger.info(f"🔌 WebSocket disconnected for user: {user_id}")
+    except Exception as e:
+        logger.error(f"❌ WebSocket error: {e}")
+        await websocket.close()
 
 async def invoke_agent_logic(request: InvocationRequest):
     """Handle standard agent invocations"""
@@ -168,6 +282,74 @@ async def handle_twin_system_request(request: TwinSystemRequest):
     except Exception as e:
         logger.error(f"❌ Error in twin system: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Twin system failed: {str(e)}")
+
+async def handle_conversation_request(request: ConversationRequest):
+    """Handle enhanced conversation with learning capabilities"""
+    try:
+        agent_id = request.agent_id
+        user_message = request.message
+        user_id = request.user_id
+        
+        if agent_id not in agents:
+            raise HTTPException(status_code=400, detail=f"Agent {agent_id} not found")
+        
+        agent = agents[agent_id]
+        agent_config = AGENT_REGISTRY[agent_id]
+        
+        # Get enhanced system prompt with learning
+        base_prompt = agent_config["system_prompt"]
+        enhanced_prompt = learning_engine.get_enhanced_system_prompt(
+            agent_id=agent_id,
+            base_prompt=base_prompt,
+            user_id=user_id
+        )
+        
+        # Create temporary agent with enhanced prompt
+        enhanced_agent = Agent(
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            system_prompt=enhanced_prompt
+        )
+        
+        logger.info(f"🤖 Enhanced conversation with {agent_config['name']}: {user_message}")
+        
+        # Get agent response
+        result = enhanced_agent(user_message)
+        message_text = extract_response_text(result)
+        
+        # Learn from the conversation if enabled
+        if request.user_id:  # Only learn if we have a user_id
+            learning_engine.learn_from_conversation(
+                agent_id=agent_id,
+                user_message=user_message,
+                agent_response=message_text,
+                user_id=user_id,
+                conversation_context={
+                    "conversation_id": request.conversation_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            )
+        
+        # Store in both new and legacy memory systems
+        store_in_memory(agent_id, user_message, message_text)
+        
+        response = {
+            "message": {
+                "role": "assistant",
+                "content": [{"text": message_text}]
+            },
+            "timestamp": datetime.utcnow().isoformat(),
+            "model": f"twin-system-{agent_id}",
+            "agent": agent_config['name'],
+            "role": agent_config['role'],
+            "conversation_id": request.conversation_id or str(uuid.uuid4()),
+            "learning_enabled": bool(request.user_id)
+        }
+        
+        return InvocationResponse(output=response)
+        
+    except Exception as e:
+        logger.error(f"❌ Error in conversation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Conversation failed: {str(e)}")
 
 async def direct_agent_communication(agent_id: str, message: str, context: Optional[Dict] = None):
     """Direct communication with a specific agent"""
@@ -292,39 +474,206 @@ def store_in_memory(agent_id: str, input_message: str, response_message: str):
     
     logger.info(f"💾 Stored in {agent_id} memory: {len(agent_memories[agent_id])} entries")
 
-@app.get("/ping")
+@app.get("/ping", response_model=StandardResponse)
 async def ping():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    return create_success_response(
+        message="AppBank AI Twins API is healthy and running",
+        data={"service": "AppBank AI Twins", "version": "1.0.0"}
+    )
 
-@app.get("/agents")
+@app.get("/agents", response_model=StandardResponse)
 async def list_agents():
     """List all available agents"""
-    return {
-        "agents": [
-            {
-                "id": agent_id,
-                "name": config["name"],
-                "role": config["role"],
-                "expertise": config["expertise"],
-                "memory_entries": len(agent_memories[agent_id])
-            }
-            for agent_id, config in AGENT_REGISTRY.items()
-        ]
-    }
+    agents_data = [
+        {
+            "id": agent_id,
+            "name": config["name"],
+            "role": config["role"],
+            "expertise": config["expertise"],
+            "memory_entries": len(agent_memories[agent_id])
+        }
+        for agent_id, config in AGENT_REGISTRY.items()
+    ]
+    
+    return create_success_response(
+        message=f"Retrieved {len(agents_data)} available agents",
+        data={"agents": agents_data, "total_count": len(agents_data)}
+    )
 
-@app.get("/agent/{agent_id}/memory")
+@app.get("/agent/{agent_id}/memory", response_model=StandardResponse)
 async def get_agent_memory(agent_id: str):
     """Get memory for a specific agent"""
     if agent_id not in agent_memories:
-        raise HTTPException(status_code=404, detail="Agent not found")
+        return create_error_response(
+            message=f"Agent '{agent_id}' not found",
+            data={"agent_id": agent_id}
+        )
     
-    return {
+    memory_data = {
         "agent_id": agent_id,
         "agent_name": AGENT_REGISTRY[agent_id]["name"],
         "memory_entries": len(agent_memories[agent_id]),
         "recent_memory": agent_memories[agent_id][-10:] if agent_memories[agent_id] else []
     }
+    
+    return create_success_response(
+        message=f"Retrieved memory for agent '{AGENT_REGISTRY[agent_id]['name']}'",
+        data=memory_data
+    )
+
+@app.get("/agent/{agent_id}/enhanced-memory", response_model=StandardResponse)
+async def get_enhanced_memory(agent_id: str, user_id: Optional[str] = None, limit: int = 50):
+    """Get enhanced memory for a specific agent"""
+    if agent_id not in AGENT_REGISTRY:
+        return create_error_response(
+            message=f"Agent '{agent_id}' not found",
+            data={"agent_id": agent_id}
+        )
+    
+    memories = memory_manager.retrieve_memories(
+        agent_id=agent_id,
+        user_id=user_id,
+        limit=limit
+    )
+    
+    memory_data = {
+        "agent_id": agent_id,
+        "agent_name": AGENT_REGISTRY[agent_id]["name"],
+        "memory_entries": len(memories),
+        "memories": [
+            {
+                "id": memory.id,
+                "content": memory.content,
+                "type": memory.memory_type,
+                "importance": memory.importance,
+                "timestamp": memory.timestamp.isoformat(),
+                "tags": memory.tags
+            }
+            for memory in memories
+        ]
+    }
+    
+    return create_success_response(
+        message=f"Retrieved enhanced memory for agent '{AGENT_REGISTRY[agent_id]['name']}'",
+        data=memory_data
+    )
+
+@app.get("/agent/{agent_id}/personality", response_model=StandardResponse)
+async def get_agent_personality(agent_id: str):
+    """Get agent's learned personality"""
+    if agent_id not in AGENT_REGISTRY:
+        return create_error_response(
+            message=f"Agent '{agent_id}' not found",
+            data={"agent_id": agent_id}
+        )
+    
+    personality = learning_engine._get_agent_personality(agent_id)
+    
+    if not personality:
+        personality_data = {
+            "agent_id": agent_id,
+            "agent_name": AGENT_REGISTRY[agent_id]["name"],
+            "personality": "No personality data available yet"
+        }
+        return create_success_response(
+            message=f"No personality data available for agent '{AGENT_REGISTRY[agent_id]['name']}'",
+            data=personality_data
+        )
+    
+    personality_data = {
+        "agent_id": agent_id,
+        "agent_name": AGENT_REGISTRY[agent_id]["name"],
+        "personality": {
+            "communication_style": personality.communication_style,
+            "technical_preferences": personality.technical_preferences,
+            "learned_phrases": personality.learned_phrases[-10:],  # Last 10 phrases
+            "expertise_areas": personality.expertise_areas,
+            "last_updated": personality.last_updated.isoformat()
+        }
+    }
+    
+    return create_success_response(
+        message=f"Retrieved personality data for agent '{AGENT_REGISTRY[agent_id]['name']}'",
+        data=personality_data
+    )
+
+@app.get("/agent/{agent_id}/context", response_model=StandardResponse)
+async def get_agent_context(agent_id: str, user_id: Optional[str] = None):
+    """Get context window for agent"""
+    if agent_id not in AGENT_REGISTRY:
+        return create_error_response(
+            message=f"Agent '{agent_id}' not found",
+            data={"agent_id": agent_id}
+        )
+    
+    context_window = memory_manager.get_context_window(agent_id, user_id)
+    
+    context_data = {
+        "agent_id": agent_id,
+        "agent_name": AGENT_REGISTRY[agent_id]["name"],
+        "context": {
+            "recent_conversations": len(context_window.recent_conversations),
+            "relevant_knowledge": len(context_window.relevant_knowledge),
+            "user_preferences": context_window.user_preferences,
+            "current_topic": context_window.current_topic
+        }
+    }
+    
+    return create_success_response(
+        message=f"Retrieved context for agent '{AGENT_REGISTRY[agent_id]['name']}'",
+        data=context_data
+    )
+
+@app.post("/agent/{agent_id}/learn", response_model=StandardResponse)
+async def trigger_learning(agent_id: str, user_id: Optional[str] = None):
+    """Trigger learning analysis for an agent"""
+    if agent_id not in AGENT_REGISTRY:
+        return create_error_response(
+            message=f"Agent '{agent_id}' not found",
+            data={"agent_id": agent_id}
+        )
+    
+    # Get recent conversations for learning
+    conversations = memory_manager.retrieve_memories(
+        agent_id=agent_id,
+        memory_type='conversation',
+        user_id=user_id,
+        limit=100
+    )
+    
+    if not conversations:
+        return create_success_response(
+            message="No conversations found for learning analysis",
+            data={"agent_id": agent_id, "conversations_analyzed": 0}
+        )
+    
+    # Extract conversation texts
+    conversation_texts = [conv.content for conv in conversations]
+    
+    # Analyze style patterns
+    insights = learning_engine.style_analyzer.extract_learning_insights(conversation_texts)
+    
+    # Store learning insights
+    memory_manager.store_memory(
+        agent_id=agent_id,
+        content=json.dumps(insights),
+        memory_type='learning_insights',
+        user_id=user_id,
+        importance=0.9
+    )
+    
+    learning_data = {
+        "agent_id": agent_id,
+        "agent_name": AGENT_REGISTRY[agent_id]["name"],
+        "learning_insights": insights,
+        "conversations_analyzed": len(conversations)
+    }
+    
+    return create_success_response(
+        message=f"Learning analysis completed for agent '{AGENT_REGISTRY[agent_id]['name']}'",
+        data=learning_data
+    )
 
 if __name__ == "__main__":
     import uvicorn

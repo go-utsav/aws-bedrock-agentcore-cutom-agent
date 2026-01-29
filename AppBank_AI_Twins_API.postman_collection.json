@@ -1,0 +1,443 @@
+{
+	"info": {
+		"_postman_id": "appbank-ai-twins-api",
+		"name": "AppBank AI Twins API",
+		"description": "Complete API collection for AppBank AI Twin System with enhanced memory and learning capabilities",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "appbank-ai-twins"
+	},
+	"item": [
+		{
+			"name": "Health & Status",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ping",
+							"host": ["{{base_url}}"],
+							"path": ["ping"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List All Agents",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/agents",
+							"host": ["{{base_url}}"],
+							"path": ["agents"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Core Chat Endpoints",
+			"item": [
+				{
+					"name": "Standard Agent Invocation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"input\": {\n    \"prompt\": \"Help me with React Native navigation setup\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/invocations",
+							"host": ["{{base_url}}"],
+							"path": ["invocations"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Enhanced Conversation (with Learning)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"message\": \"I need help with database optimization for our mobile app\",\n  \"agent_id\": \"karti_database\",\n  \"user_id\": \"user_123\",\n  \"conversation_id\": \"conv_456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/conversation",
+							"host": ["{{base_url}}"],
+							"path": ["conversation"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Twin System Orchestration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"user_message\": \"We need to build a full-stack mobile app with AI features\",\n  \"target_agent\": null,\n  \"collaboration_mode\": \"orchestrator\",\n  \"context\": {\n    \"project_type\": \"mobile_app\",\n    \"timeline\": \"3_months\"\n  },\n  \"user_id\": \"project_manager_123\",\n  \"enable_learning\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/twin-system",
+							"host": ["{{base_url}}"],
+							"path": ["twin-system"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Direct Agent Communication",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"user_message\": \"What's the best approach for implementing real-time chat in React Native?\",\n  \"target_agent\": \"nayeem_mobile\",\n  \"collaboration_mode\": \"direct\",\n  \"context\": {\n    \"current_tech_stack\": [\"React Native\", \"Firebase\", \"Redux\"]\n  },\n  \"user_id\": \"mobile_dev_456\",\n  \"enable_learning\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/twin-system",
+							"host": ["{{base_url}}"],
+							"path": ["twin-system"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Agent-Specific Endpoints",
+			"item": [
+				{
+					"name": "Nayeem (Mobile Developer)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"message\": \"How do I implement push notifications in React Native?\",\n  \"agent_id\": \"nayeem_mobile\",\n  \"user_id\": \"mobile_dev_789\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/conversation",
+							"host": ["{{base_url}}"],
+							"path": ["conversation"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Karti (Database Developer)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"message\": \"What's the best database design for a social media app?\",\n  \"agent_id\": \"karti_database\",\n  \"user_id\": \"backend_dev_101\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/conversation",
+							"host": ["{{base_url}}"],
+							"path": ["conversation"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Niyas (AI Developer)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"message\": \"How can I implement machine learning for recommendation system?\",\n  \"agent_id\": \"niyas_ai\",\n  \"user_id\": \"ai_dev_202\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/conversation",
+							"host": ["{{base_url}}"],
+							"path": ["conversation"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Utsav (Full Stack & Cloud)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"message\": \"How should I deploy this app on AWS with auto-scaling?\",\n  \"agent_id\": \"utsav_fullstack\",\n  \"user_id\": \"devops_303\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/conversation",
+							"host": ["{{base_url}}"],
+							"path": ["conversation"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Owner/CEO (Business Strategy)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"message\": \"What's our go-to-market strategy for this mobile app?\",\n  \"agent_id\": \"owner_ceo\",\n  \"user_id\": \"exec_404\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/conversation",
+							"host": ["{{base_url}}"],
+							"path": ["conversation"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Memory & Learning",
+			"item": [
+				{
+					"name": "Get Agent Memory (Legacy)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/agent/nayeem_mobile/memory",
+							"host": ["{{base_url}}"],
+							"path": ["agent", "nayeem_mobile", "memory"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Enhanced Memory",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/agent/nayeem_mobile/enhanced-memory?user_id=user_123&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["agent", "nayeem_mobile", "enhanced-memory"],
+							"query": [
+								{
+									"key": "user_id",
+									"value": "user_123"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Agent Personality",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/agent/nayeem_mobile/personality",
+							"host": ["{{base_url}}"],
+							"path": ["agent", "nayeem_mobile", "personality"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Agent Context",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/agent/nayeem_mobile/context?user_id=user_123",
+							"host": ["{{base_url}}"],
+							"path": ["agent", "nayeem_mobile", "context"],
+							"query": [
+								{
+									"key": "user_id",
+									"value": "user_123"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Trigger Learning Analysis",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/agent/nayeem_mobile/learn?user_id=user_123",
+							"host": ["{{base_url}}"],
+							"path": ["agent", "nayeem_mobile", "learn"],
+							"query": [
+								{
+									"key": "user_id",
+									"value": "user_123"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "WebSocket Testing",
+			"item": [
+				{
+					"name": "WebSocket Connection Test",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ws/test_user_123",
+							"host": ["{{base_url}}"],
+							"path": ["ws", "test_user_123"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Multi-Agent Scenarios",
+			"item": [
+				{
+					"name": "Mobile App Development Project",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"user_message\": \"We need to build a social media mobile app with real-time chat, AI recommendations, and cloud deployment. Can you coordinate the team?\",\n  \"target_agent\": null,\n  \"collaboration_mode\": \"orchestrator\",\n  \"context\": {\n    \"project_name\": \"SocialConnect\",\n    \"timeline\": \"6_months\",\n    \"team_size\": 5,\n    \"budget\": \"$100k\"\n  },\n  \"user_id\": \"project_manager_001\",\n  \"enable_learning\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/twin-system",
+							"host": ["{{base_url}}"],
+							"path": ["twin-system"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Database Migration Project",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"user_message\": \"We need to migrate from MySQL to PostgreSQL and optimize for our growing user base. What's the best approach?\",\n  \"target_agent\": \"karti_database\",\n  \"collaboration_mode\": \"direct\",\n  \"context\": {\n    \"current_db\": \"MySQL 8.0\",\n    \"target_db\": \"PostgreSQL 15\",\n    \"data_size\": \"500GB\",\n    \"downtime_window\": \"4_hours\"\n  },\n  \"user_id\": \"dba_lead_002\",\n  \"enable_learning\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/twin-system",
+							"host": ["{{base_url}}"],
+							"path": ["twin-system"]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	],
+	"info": {
+		"_postman_id": "appbank-ai-twins-api",
+		"name": "AppBank AI Twins API - Standardized",
+		"description": "Complete API collection for AppBank AI Twin System with standardized response format:\n\n**Standard Response Format:**\n```json\n{\n  \"status\": \"success\" | \"error\",\n  \"message\": \"Human readable message\",\n  \"data\": { /* Response data */ },\n  \"timestamp\": \"2024-01-01T00:00:00Z\"\n}\n```\n\n**All endpoints now return this consistent format for easy frontend integration.**",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "appbank-ai-twins"
+	}
+}
